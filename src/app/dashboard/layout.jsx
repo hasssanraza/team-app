@@ -2,7 +2,7 @@ import NotificationList from '@/components/notifications/NotificationList'
 
 export default function RootLayout({ children }) {
     return (
-        <html lang="en" suppressHydrationWarning>
+        <html lang="en">
             <body>
                 <div className="min-h-screen">
                     <header className="border-b lg:pl-64">

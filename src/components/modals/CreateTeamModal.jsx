@@ -22,6 +22,8 @@ export function CreateTeamModal() {
     setLoading(true)
 
     try {
+      console.log('Submitting form data:', formData); // Debug log
+
       const response = await fetch("/api/teams", {
         method: "POST",
         headers: {
@@ -31,22 +33,37 @@ export function CreateTeamModal() {
         credentials: "include",
       })
 
+      console.log('Response status:', response.status); // Debug log
+
+      const data = await response.json()
+      console.log('Response data:', data); // Debug log
+
       if (!response.ok) {
-        throw new Error("Failed to create team")
+        throw new Error(data.error || "Failed to create team. Please try again.")
       }
 
       toast.success("Team created successfully")
       setOpen(false)
+      setFormData({ name: "", description: "" }) // Reset form
       router.refresh()
     } catch (error) {
-      toast.error(error.message)
+      console.error('Error in handleSubmit:', error); // Debug log
+      toast.error(error.message || "An error occurred while creating the team")
     } finally {
       setLoading(false)
     }
   }
 
+  const handleOpenChange = (newOpen) => {
+    setOpen(newOpen)
+    if (!newOpen) {
+      // Reset form when modal is closed
+      setFormData({ name: "", description: "" })
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>Create Team</Button>
       </DialogTrigger>
@@ -62,6 +79,8 @@ export function CreateTeamModal() {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
+              placeholder="Enter team name"
+              disabled={loading}
             />
           </div>
           <div className="space-y-2">
@@ -70,6 +89,8 @@ export function CreateTeamModal() {
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Enter team description"
+              disabled={loading}
             />
           </div>
           <Button type="submit" disabled={loading}>

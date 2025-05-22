@@ -27,6 +27,7 @@ export default function SignInForm() {
     register,
     handleSubmit,
     formState: { errors },
+    setError,
   } = useForm({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -45,7 +46,16 @@ export default function SignInForm() {
       });
 
       if (result?.error) {
-        throw new Error(result.error);
+        setError('root', {
+          type: 'manual',
+          message: 'Invalid email or password',
+        });
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: "Invalid email or password. Please try again.",
+        });
+        return;
       }
 
       toast({
@@ -59,7 +69,7 @@ export default function SignInForm() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message,
+        description: error.message || "An error occurred during sign in",
       });
     } finally {
       setIsLoading(false);
@@ -100,6 +110,10 @@ export default function SignInForm() {
               <p className="text-sm text-destructive">{errors.password.message}</p>
             )}
           </div>
+
+          {errors.root && (
+            <p className="text-sm text-destructive">{errors.root.message}</p>
+          )}
         </CardContent>
 
         <CardFooter className="flex flex-col space-y-4">

@@ -21,7 +21,7 @@ export async function POST(req) {
     const body = await req.json();
     console.log('Request body:', body); // Debug log
 
-    const { name, description } = body;
+    const { name, description, members } = body;
 
     if (!name) {
       console.log('Missing team name'); // Debug log
@@ -44,11 +44,14 @@ export async function POST(req) {
       );
     }
 
+    // Create array of member IDs including the team leader
+    const memberIds = [session.user.id, ...(members || [])];
+
     const teamData = {
       name,
       description,
       leader: session.user.id,
-      members: [session.user.id],
+      members: memberIds,
     };
     console.log('Creating team with data:', teamData); // Debug log
 

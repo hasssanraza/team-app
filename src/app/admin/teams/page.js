@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 
 // Fetch teams
@@ -29,6 +31,17 @@ async function fetchTeams() {
   });
   if (!response.ok) {
     throw new Error('Failed to fetch teams');
+  }
+  return response.json();
+}
+
+// Fetch users
+async function fetchUsers() {
+  const response = await fetch('/api/users', {
+    credentials: 'include'
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch users');
   }
   return response.json();
 }
@@ -77,6 +90,7 @@ export default function TeamsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [selectedMembers, setSelectedMembers] = useState([]);
   const queryClient = useQueryClient();
 
   const { data: teams, isLoading } = useQuery({
@@ -84,11 +98,18 @@ export default function TeamsPage() {
     queryFn: fetchTeams,
   });
 
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: fetchUsers,
+    enabled: isCreateDialogOpen || isEditDialogOpen,
+  });
+
   const createMutation = useMutation({
     mutationFn: createTeam,
     onSuccess: () => {
       queryClient.invalidateQueries(['teams']);
       setIsCreateDialogOpen(false);
+      setSelectedMembers([]);
       toast.success('Team created successfully');
     },
     onError: (error) => {
@@ -101,6 +122,8 @@ export default function TeamsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries(['teams']);
       setIsEditDialogOpen(false);
+      setSelectedTeam(null);
+      setSelectedMembers([]);
       toast.success('Team updated successfully');
     },
     onError: (error) => {
@@ -125,6 +148,7 @@ export default function TeamsPage() {
     createMutation.mutate({
       name: formData.get('name'),
       description: formData.get('description'),
+      members: selectedMembers,
     });
   };
 
@@ -136,9 +160,24 @@ export default function TeamsPage() {
       teamData: {
         name: formData.get('name'),
         description: formData.get('description'),
+        members: selectedMembers,
       },
     });
   };
+
+  const handleMemberToggle = (userId) => {
+    setSelectedMembers(prev => 
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  useEffect(() => {
+    if (selectedTeam) {
+      setSelectedMembers(selectedTeam.members.map(member => member._id));
+    }
+  }, [selectedTeam]);
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -152,7 +191,7 @@ export default function TeamsPage() {
           <DialogTrigger asChild>
             <Button>Add Team</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New Team</DialogTitle>
             </DialogHeader>
@@ -165,7 +204,32 @@ export default function TeamsPage() {
                 <Label htmlFor="description">Description</Label>
                 <Input id="description" name="description" required />
               </div>
-              <Button type="submit">Create Team</Button>
+              <div className="space-y-2">
+                <Label>Team Members</Label>
+                <ScrollArea className="h-[200px] rounded-md border p-4">
+                  <div className="space-y-2">
+                    {users?.map((user) => (
+                      <div key={user._id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`user-${user._id}`}
+                          checked={selectedMembers.includes(user._id)}
+                          onCheckedChange={() => handleMemberToggle(user._id)}
+                          disabled={createMutation.isPending}
+                        />
+                        <label
+                          htmlFor={`user-${user._id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {user.name} ({user.email})
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? "Creating..." : "Create Team"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -194,7 +258,10 @@ export default function TeamsPage() {
                     open={isEditDialogOpen && selectedTeam?._id === team._id}
                     onOpenChange={(open) => {
                       setIsEditDialogOpen(open);
-                      if (!open) setSelectedTeam(null);
+                      if (!open) {
+                        setSelectedTeam(null);
+                        setSelectedMembers([]);
+                      }
                     }}
                   >
                     <DialogTrigger asChild>
@@ -205,7 +272,7 @@ export default function TeamsPage() {
                         Edit
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-2xl">
                       <DialogHeader>
                         <DialogTitle>Edit Team</DialogTitle>
                       </DialogHeader>
@@ -228,7 +295,32 @@ export default function TeamsPage() {
                             required
                           />
                         </div>
-                        <Button type="submit">Update Team</Button>
+                        <div className="space-y-2">
+                          <Label>Team Members</Label>
+                          <ScrollArea className="h-[200px] rounded-md border p-4">
+                            <div className="space-y-2">
+                              {users?.map((user) => (
+                                <div key={user._id} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`edit-user-${user._id}`}
+                                    checked={selectedMembers.includes(user._id)}
+                                    onCheckedChange={() => handleMemberToggle(user._id)}
+                                    disabled={updateMutation.isPending}
+                                  />
+                                  <label
+                                    htmlFor={`edit-user-${user._id}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    {user.name} ({user.email})
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                        <Button type="submit" disabled={updateMutation.isPending}>
+                          {updateMutation.isPending ? "Updating..." : "Update Team"}
+                        </Button>
                       </form>
                     </DialogContent>
                   </Dialog>

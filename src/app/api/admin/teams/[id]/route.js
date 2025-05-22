@@ -55,7 +55,7 @@ export async function PUT(req, { params }) {
     }
 
     const { id } = params;
-    const { name, description } = await req.json();
+    const { name, description, members } = await req.json();
 
     if (!name || !description) {
       return NextResponse.json(
@@ -66,9 +66,17 @@ export async function PUT(req, { params }) {
 
     await connectDB();
     
+    // Create array of member IDs including the admin
+    const session = await getServerSession(authOptions);
+    const memberIds = [session.user.id, ...(members || [])];
+
     const team = await Team.findByIdAndUpdate(
       id,
-      { name, description },
+      { 
+        name, 
+        description,
+        members: memberIds
+      },
       { new: true }
     ).populate('members', 'name email');
 

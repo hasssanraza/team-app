@@ -60,7 +60,7 @@ export async function POST(req) {
       );
     }
 
-    const { name, description } = await req.json();
+    const { name, description, members } = await req.json();
 
     if (!name || !description) {
       return NextResponse.json(
@@ -70,14 +70,22 @@ export async function POST(req) {
     }
 
     await connectDB();
+
+    // Create array of member IDs including the admin
+    const memberIds = [session.user.id, ...(members || [])];
+
     const team = await Team.create({
       name,
       description,
       leader: session.user.id,
-      members: [session.user.id], // Add the leader as the first member
+      members: memberIds,
     });
 
-    return NextResponse.json(team, { status: 201 });
+    // Populate members before sending response
+    const populatedTeam = await Team.findById(team._id)
+      .populate('members', 'name email');
+
+    return NextResponse.json(populatedTeam, { status: 201 });
   } catch (error) {
     console.error('Error creating team:', error);
     return NextResponse.json(

@@ -18,8 +18,17 @@ export async function GET() {
 
     await connectDB();
 
-    // Get team members
+    // Get team members count
     const teamMembers = await User.countDocuments();
+
+    // Get total tasks
+    const totalTasks = await Task.countDocuments();
+
+    // Get completed tasks
+    const completedTasks = await Task.countDocuments({ status: 'completed' });
+
+    // Get pending tasks (tasks that are not completed)
+    const pendingTasks = await Task.countDocuments({ status: { $ne: 'completed' } });
 
     // Get task trend for the last 7 days
     const taskTrend = await Promise.all(
@@ -29,45 +38,36 @@ export async function GET() {
         const startOfDay = new Date(date.setHours(0, 0, 0, 0));
         const endOfDay = new Date(date.setHours(23, 59, 59, 999));
 
-        const count = await Task.countDocuments({
-          createdAt: {
-            $gte: startOfDay,
-            $lte: endOfDay,
-          },
-        });
+        const [created, completed] = await Promise.all([
+          Task.countDocuments({
+            createdAt: {
+              $gte: startOfDay,
+              $lte: endOfDay,
+            },
+          }),
+          Task.countDocuments({
+            status: 'completed',
+            updatedAt: {
+              $gte: startOfDay,
+              $lte: endOfDay,
+            },
+          }),
+        ]);
 
         return {
           date: startOfDay.toISOString().split('T')[0],
-          count,
+          created,
+          completed,
         };
       })
     );
 
-    // Get task status distribution
-    const taskStatus = await Task.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    // Get task priority distribution
-    const taskPriority = await Task.aggregate([
-      {
-        $group: {
-          _id: '$priority',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
     return NextResponse.json({
       teamMembers,
+      totalTasks,
+      completedTasks,
+      pendingTasks,
       taskTrend: taskTrend.reverse(),
-      taskStatus,
-      taskPriority,
     });
   } catch (error) {
     console.error('Analytics error:', error);
